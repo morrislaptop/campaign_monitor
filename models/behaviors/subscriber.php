@@ -48,8 +48,8 @@ class SubscriberBehavior extends ModelBehavior
 	function setup(&$model, $settings) {
 		if (!isset($this->settings[$model->alias])) {
 			$this->settings[$model->alias] = array(
-				'ApiKey' => 'option1_default_value',
-				'ListId' => 'option2_default_value',
+				'ApiKey' => '',
+				'ListId' => '',
 				'CustomFields' => array(),
 				'StaticFields' => array(),
 				'email' => 'email',
@@ -74,6 +74,12 @@ class SubscriberBehavior extends ModelBehavior
 			if ( !$model->hasField($field) ) {
 				trigger_error($model->alias . ' does not have the field: ' . $field);
 			}
+		}
+		if ( empty($ApiKey) ) {
+			trigger_error('ApiKey is missing');
+		}
+		if ( empty($ListId) ) {
+			trigger_error('ListId is missing');
 		}
 	}
 
