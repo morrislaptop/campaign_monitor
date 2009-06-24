@@ -95,10 +95,13 @@ class SubscriberBehavior extends ModelBehavior
 		$settings = $this->settings[$model->alias];
 		extract($settings);
 		$data = $model->read();
-		if ( $optin && empty($data[$model->alias][$optin]) ) {
+		
+		// unsubscribe if this isnt new AND the optin field is empty (only if there is an optin field)
+		if ( !$created && $optin && empty($data[$model->alias][$optin]) ) {
 			$result = $this->unsubscribe($data[$model->alias][$email]);
 		}
-		else {
+		// subscribe if the opt in field is set (or there is no opt in field)
+		else if ( !$optin || !empty($data[$model->alias][$optin]) ) {
 			$email = $data[$model->alias][$email];
 			$name = $data[$model->alias][$name];
 			$customFields = $this->_getCustomFields($data[$model->alias], $CustomFields, $StaticFields);
