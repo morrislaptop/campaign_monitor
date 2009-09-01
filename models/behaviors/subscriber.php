@@ -58,32 +58,16 @@ class SubscriberBehavior extends ModelBehavior
 			);
 		}
 		$this->settings[$model->alias] = array_merge($this->settings[$model->alias], (array) $settings);
-		$this->quickCheck($model);
 		$this->cm = $this->cm($model);
 	}
 
-	function quickCheck($model) {
-		$settings = $this->settings[$model->alias];
-		extract($settings);
-		$fields = array($email, $name, $optin);
-		$fields = array_filter($fields); // removes false entries if optin is set to false
-		foreach ($CustomFields as $key => $field) {
-			$fields[] = is_numeric($key) ? $field : $key;
-		}
-		foreach ($fields as $field) {
-			if ( !$model->hasField($field) ) {
-				trigger_error($model->alias . ' does not have the field: ' . $field);
-			}
-		}
-		if ( empty($ApiKey) ) {
-			trigger_error('ApiKey is missing');
-		}
-		if ( empty($ListId) ) {
-			trigger_error('ListId is missing');
-		}
-	}
-
-	function cm($model) {
+	/**
+	* Creates the CM object to be used by the class.
+	*
+	* @param mixed $model
+	* @return CampaignMonitor
+	*/
+	function cm(&$model) {
 		App::import('Vendor', 'CampaignMonitor.CampaignMonitor', array('file' => 'CampaignMonitor' . DS . 'CMBase.php'));
 		$settings = $this->settings[$model->alias];
 		extract($settings);
@@ -91,24 +75,76 @@ class SubscriberBehavior extends ModelBehavior
 		return $cm;
 	}
 
-	function afterSave($model, $created) {
+	/**
+	* Checks the data after a save and subscribes / unsubscribes them
+	*
+	* @param mixed $model
+	* @param mixed $created
+	*/
+	function afterSave(&$model, $created) {
 		$settings = $this->settings[$model->alias];
 		extract($settings);
 		$data = $model->read();
-		
-		// unsubscribe if this isnt new AND the optin field is empty (only if there is an optin field)
-		if ( !$created && $optin && empty($data[$model->alias][$optin]) ) {
-			$result = $this->unsubscribe($data[$model->alias][$email]);
+		list($email, $name, $hasOpted) = $this->_extract($model, $data);
+
+		// unsubscribe if this is existing and he hasnt opted in
+		if ( !$created && !$hasOpted ) {
+			$result = $this->_unsubscribe($email);
 		}
-		// subscribe if the opt in field is set (or there is no opt in field)
-		else if ( !$optin || !empty($data[$model->alias][$optin]) ) {
-			$email = $data[$model->alias][$email];
-			$name = $data[$model->alias][$name];
-			$customFields = $this->_getCustomFields($data[$model->alias], $CustomFields, $StaticFields);
-			$result = $this->subscribe($email, $name, $customFields);
+		// subscribe he has opted
+		else if ( $hasOpted ) {
+			$result = $this->subscribe($model, $data);
 		}
 	}
 
+	/**
+	* Returns the email, name and optin values from the data based on the settings. hasOpted
+	* will be true if there is no optin field set.
+	*
+	* @param mixed $data
+	*/
+	function _extract(&$model, $data)
+	{
+		$settings = $this->settings[$model->alias];
+		extract($settings);
+
+		// Get data out for email.
+		$alias = $model->alias;
+		if ( strpos($email, '.') ) {
+			list($alias, $email) = explode('.', $email);
+		}
+		$email = $data[$alias][$email];
+
+		// Get data out for name.
+		$alias = $model->alias;
+		if ( strpos($name, '.') ) {
+			list($alias, $name) = explode('.', $name);
+		}
+		$name = $data[$alias][$name];
+
+		// Get data out for optin
+		$hasOpted = true;
+		if ( $optin ) {
+			$alias = $model->alias;
+			if ( strpos($optin, '.') ) {
+				list($alias, $optin) = explode('.', $optin);
+			}
+			$hasOpted = $data[$alias][$optin];
+		}
+
+		$arr = array($email, $name, $hasOpted);
+		return $arr;
+	}
+
+	/**
+	* Returns an array of all the custom fields to be sent to campaign monitor, this
+	* comprises of the CustomFields (from the model data) and the static fields (
+	* these are usually constant flags or something)
+	*
+	* @param mixed $data
+	* @param mixed $CustomFields
+	* @param mixed $StaticFields
+	*/
 	function _getCustomFields($data, $CustomFields, $StaticFields)
 	{
 		$myCustomFields = array();
@@ -128,21 +164,56 @@ class SubscriberBehavior extends ModelBehavior
 		return $myCustomFields;
 	}
 
-	function beforeDelete($model) {
-		$settings = $this->settings[$model->alias];
-		extract($settings);
-		$email = $model->field($email);
-		$this->unsubscribe($email);
+	/**
+	* If deleting a model, lets unsubsribe them
+	*
+	* @param mixed $model
+	* @return boolean
+	*/
+	function beforeDelete(&$model) {
+		$this->unsubscribe($model);
 	}
 
-	function subscribe($email, $name = null, $custom_fields = array()) {
+	/**
+	* Subscribes the model into campaign monitor
+	*
+	* @param mixed $model
+	* @param mixed $data
+	*/
+	function subscribe(&$model, $data = null)
+	{
+		$settings = $this->settings[$model->alias];
+		extract($settings);
+		if ( !$data ) {
+			$data = $model->read();
+		}
+		list($email, $name, $hasOpted) = $this->_extract($model, $data);
+
+		$custom_fields = $this->_getCustomFields($data, $CustomFields, $StaticFields);
+
+		$this->_subscribe($email, $name, $custom_fields);
+	}
+	function _subscribe($email, $name = null, $custom_fields = array()) {
 		$result = $this->cm->subscriberAddAndResubscribeWithCustomFields($email, $name, $custom_fields);
 		if ($result['Code'] == 0)
 			return true;
 		else
 			trigger_error('Campaign Monitor Error: ' . $result['Message']);
 	}
-	function unsubscribe($email) {
+
+	/**
+	* Unsubscribes the model from campaign monitor
+	*
+	* @param mixed $model
+	*/
+	function unsubscribe(&$model) {
+		$settings = $this->settings[$model->alias];
+		extract($settings);
+		$data = $model->read();
+		list($email, $name, $hasOpted) = $this->_extract($model, $data);
+		$this->_unsubscribe($email);
+	}
+	function _unsubscribe($email) {
 		$result = $this->cm->subscriberUnsubscribe($email);
 		if ($result['Result']['Code'] == 0)
 			return true;
