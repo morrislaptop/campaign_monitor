@@ -117,10 +117,13 @@ class SubscriberBehavior extends ModelBehavior
 
 		// Get data out for name.
 		$alias = $model->alias;
+		$myName = null;
 		if ( strpos($name, '.') ) {
 			list($alias, $name) = explode('.', $name);
 		}
-		$name = $data[$alias][$name];
+		if ( isset($data[$alias][$name]) ) {
+			$myName = $data[$alias][$name];
+		}
 
 		// Get data out for optin
 		$hasOpted = true;
@@ -129,10 +132,12 @@ class SubscriberBehavior extends ModelBehavior
 			if ( strpos($optin, '.') ) {
 				list($alias, $optin) = explode('.', $optin);
 			}
-			$hasOpted = $data[$alias][$optin];
+			if ( isset($data[$alias][$optin]) ) {
+				$hasOpted = $data[$alias][$optin];
+			}
 		}
 
-		$arr = array($email, $name, $hasOpted);
+		$arr = array($email, $myName, $hasOpted);
 		return $arr;
 	}
 
@@ -189,7 +194,7 @@ class SubscriberBehavior extends ModelBehavior
 		}
 		list($email, $name, $hasOpted) = $this->_extract($model, $data);
 
-		$custom_fields = $this->_getCustomFields($data, $CustomFields, $StaticFields);
+		$custom_fields = $this->_getCustomFields($data[$model->alias], $CustomFields, $StaticFields);
 
 		$this->_subscribe($email, $name, $custom_fields);
 	}
