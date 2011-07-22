@@ -82,6 +82,16 @@ class SubscriberBehavior extends ModelBehavior
 	* @param mixed $created
 	*/
 	function afterSave(&$model, $created) {
+		$this->syncRecord($model, $created);
+	}
+	
+	/**
+	 * Public function to sync the record, used in afterSave or manual sync calls
+	 * 
+	 * @param mixed $model
+	 * @param mixed $created 
+	 */
+	function syncRecord(&$model, $created) {
 		$settings = $this->settings[$model->alias];
 		extract($settings);
 		$data = $model->read();
