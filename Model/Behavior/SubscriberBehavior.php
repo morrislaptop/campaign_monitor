@@ -68,14 +68,8 @@ class SubscriberBehavior extends ModelBehavior
 	* @return CampaignMonitor
 	*/
 	function cm(&$model) {
-		//require(dirname(__FILE__) . '/../../Vendor/CampaignMonitor/Ven.inc.php');
-		//debug(APP. 'Plugin' . DS . 'CampaignMonitor' . DS . 'vendors' . DS . 'CampaignMonitor' . DS . 'CMBase.php');
-		//debug(APP. 'Plugin' . DS . 'CampaignMonitor' . DS);die();
-		//App::import('Vendor', 'CampaignMonitor.CampaignMonitor', array('file' => APP. 'Plugin' . DS . 'CampaignMonitor' . DS . 'vendors' . DS . 'CampaignMonitor' . DS . 'CMBase.php'));
-		$path = APP. 'Plugin' . DS . 'CampaignMonitor' . DS . 'Vendor' . DS . 'CampaignMonitor' . DS . 'CMBase.php';
-		//App::build(array('Vendor' => array( $path)));
-		//App::uses('CampaignMonitor', 'Vendor');
-		$path = require_once($path);		// To be fixed
+		$file = 'CampaignMonitor' . DS . 'CMBase.php';
+	  	App::import('Vendor', 'CampaignMonitor.CampaignMonitor', array('file'=>$file));
 		
 		$settings = $this->settings[$model->alias];
 		extract($settings);
